@@ -60,14 +60,29 @@ type LemlistCampaignListItem = {
   status?: string;
 };
 
-type LemlistActivity = {
-  campaignId?: string;
-  createdAt?: string;
-  type?: string;
-  metaData?: {
-    campaignId?: string;
-    type?: string;
-  };
+type LemlistCampaignStepStats = {
+  sent?: number | string;
+  opened?: number | string;
+  clicked?: number | string;
+  replied?: number | string;
+  sentCount?: number | string;
+  openedCount?: number | string;
+  clickedCount?: number | string;
+  repliedCount?: number | string;
+  [key: string]: unknown;
+};
+
+type LemlistCampaignStats = {
+  sent?: number | string;
+  opened?: number | string;
+  clicked?: number | string;
+  replied?: number | string;
+  sentCount?: number | string;
+  openedCount?: number | string;
+  clickedCount?: number | string;
+  repliedCount?: number | string;
+  steps?: LemlistCampaignStepStats[];
+  [key: string]: unknown;
 };
 
 function parseDdMmYyyy(value: string): Date | null {
@@ -167,48 +182,80 @@ async function fetchFluentFormLeads(startDate: string, endDate: string): Promise
   });
 }
 
-function normalizeMetricDate(rawValue: unknown): string {
-  const raw = String(rawValue ?? "").trim();
-  if (!raw) return "";
-  const leadingIsoDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (leadingIsoDate) return leadingIsoDate[1];
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}-${String(parsed.getUTCDate()).padStart(
-    2,
-    "0"
-  )}`;
+function toIsoUtcBoundary(dateValue: string, boundary: "start" | "end"): string {
+  return boundary === "start" ? `${dateValue}T00:00:00.000Z` : `${dateValue}T23:59:59.999Z`;
 }
 
-async function fetchLemlistActivitiesLive(startDate: string): Promise<LemlistActivity[]> {
-  if (!env.LEMLIST_API_KEY) return [];
-  const basicToken = Buffer.from(`:${env.LEMLIST_API_KEY}`).toString("base64");
-  const all: LemlistActivity[] = [];
-  for (let page = 1; page <= 200; page += 1) {
-    const endpoint = `https://api.lemlist.com/api/activities?perPage=200&page=${page}`;
-    const response = await fetch(endpoint, {
-      headers: { Accept: "application/json", Authorization: `Basic ${basicToken}` }
-    });
-    if (!response.ok) {
-      if (response.status === 429) break;
-      return [];
+function toFiniteNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pickMetricValue(source: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    if (key in source) {
+      return toFiniteNumber(source[key]);
     }
-    const body = (await response.json()) as unknown;
-    const rows = Array.isArray(body) ? (body as LemlistActivity[]) : [];
-    if (rows.length === 0) break;
-    all.push(...rows);
-    // Lemlist activities are returned newest-first; once the page is fully older
-    // than requested window we can stop pagination.
-    const pageDates = rows
-      .map((row) => normalizeMetricDate(row.createdAt))
-      .filter((date) => date.length > 0)
-      .sort();
-    if (pageDates.length > 0 && pageDates[pageDates.length - 1] < startDate) {
-      break;
-    }
-    if (rows.length < 200) break;
   }
-  return all;
+  return 0;
+}
+
+function summarizeLemlistStats(stats: LemlistCampaignStats): { sent: number; opened: number; clicked: number; replied: number } {
+  const topLevel = {
+    sent: pickMetricValue(stats, ["messagesSent", "sentCount", "sent", "emailsSent"]),
+    opened: pickMetricValue(stats, ["openedCount", "opened", "emailsOpened"]),
+    clicked: pickMetricValue(stats, ["clickedCount", "clicked", "emailsClicked"]),
+    replied: pickMetricValue(stats, ["repliedCount", "replied", "emailsReplied"])
+  };
+
+  const steps = Array.isArray(stats.steps) ? stats.steps : [];
+  if (steps.length === 0) {
+    return topLevel;
+  }
+
+  const stepTotals = steps.reduce<{ sent: number; opened: number; clicked: number; replied: number }>(
+    (acc, step) => {
+      acc.sent += pickMetricValue(step, ["sentCount", "sent", "emailsSent"]);
+      acc.opened += pickMetricValue(step, ["openedCount", "opened", "emailsOpened"]);
+      acc.clicked += pickMetricValue(step, ["clickedCount", "clicked", "emailsClicked"]);
+      acc.replied += pickMetricValue(step, ["repliedCount", "replied", "emailsReplied"]);
+      return acc;
+    },
+    { sent: 0, opened: 0, clicked: 0, replied: 0 }
+  );
+
+  return {
+    sent: Math.max(topLevel.sent, stepTotals.sent),
+    opened: Math.max(topLevel.opened, stepTotals.opened),
+    clicked: Math.max(topLevel.clicked, stepTotals.clicked),
+    replied: Math.max(topLevel.replied, stepTotals.replied)
+  };
+}
+
+async function fetchLemlistCampaignStatsLive(
+  campaignId: string,
+  startDate: string,
+  endDate: string,
+  basicToken: string
+): Promise<LemlistCampaignStats | null> {
+  const endpoint =
+    `https://api.lemlist.com/api/campaigns/${campaignId}/stats?startDate=${encodeURIComponent(
+      toIsoUtcBoundary(startDate, "start")
+    )}&endDate=${encodeURIComponent(toIsoUtcBoundary(endDate, "end"))}`;
+  const response = await fetch(endpoint, {
+    headers: { Accept: "application/json", Authorization: `Basic ${basicToken}` }
+  });
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 429) {
+      return null;
+    }
+    throw new Error(`Lemlist campaign stats failed with ${response.status}`);
+  }
+  const body = (await response.json()) as unknown;
+  if (typeof body !== "object" || body === null) {
+    return null;
+  }
+  return body as LemlistCampaignStats;
 }
 
 async function fetchLemlistCampaignsLive(startDate: string, endDate: string) {
@@ -225,35 +272,17 @@ async function fetchLemlistCampaignsLive(startDate: string, endDate: string) {
 
   // Include all active sequences (not just running) by excluding archived campaigns only.
   const activeCampaigns = campaigns.filter((campaign) => !Boolean(campaign.archived));
-  const activities = await fetchLemlistActivitiesLive(startDate);
-  const countsByCampaign = new Map<string, { sent: number; opened: number; clicked: number; replied: number }>();
-
-  for (const activity of activities) {
-    const date = normalizeMetricDate(activity.createdAt);
-    if (!date || date < startDate || date > endDate) continue;
-    const campaignId = String(activity.campaignId ?? activity.metaData?.campaignId ?? "").trim();
-    if (!campaignId) continue;
-    const type = String(activity.type ?? activity.metaData?.type ?? "").trim().toLowerCase();
-    if (!type) continue;
-    const bucket = countsByCampaign.get(campaignId) ?? { sent: 0, opened: 0, clicked: 0, replied: 0 };
-    if (type === "emailssent") bucket.sent += 1;
-    if (type === "emailsopened") bucket.opened += 1;
-    if (type === "emailsclicked") bucket.clicked += 1;
-    if (type === "emailsreplied") bucket.replied += 1;
-    countsByCampaign.set(campaignId, bucket);
-  }
 
   const statsByCampaign = await Promise.all(
     activeCampaigns.map(async (campaign) => {
       const campaignId = String(campaign._id ?? "").trim();
       if (!campaignId) return null;
-      const activityCounts = countsByCampaign.get(campaignId) ?? { sent: 0, opened: 0, clicked: 0, replied: 0 };
-      // Use activity-window counts as source of truth for date filters.
-      // Stats endpoint can return non-windowed values for some sequences.
-      const emailsSent = activityCounts.sent;
-      const opened = Math.min(activityCounts.opened, emailsSent);
-      const clicked = Math.min(activityCounts.clicked, emailsSent);
-      const replied = Math.min(activityCounts.replied, emailsSent);
+      const stats = await fetchLemlistCampaignStatsLive(campaignId, startDate, endDate, basicToken);
+      const summary = stats ? summarizeLemlistStats(stats) : { sent: 0, opened: 0, clicked: 0, replied: 0 };
+      const emailsSent = summary.sent;
+      const opened = Math.min(summary.opened, emailsSent);
+      const clicked = Math.min(summary.clicked, emailsSent);
+      const replied = Math.min(summary.replied, emailsSent);
       return {
         campaign_name: String(campaign.name ?? campaignId),
         emails_sent: String(emailsSent),

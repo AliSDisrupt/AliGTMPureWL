@@ -143,7 +143,11 @@ async function fetchAppJson<T>(path: string): Promise<T> {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const baseUrl = `${proto}://${host}`;
-  const response = await fetch(`${baseUrl}${path}`, { cache: "no-store" });
+  const cookieHeader = h.get("cookie") ?? "";
+  const response = await fetch(`${baseUrl}${path}`, {
+    cache: "no-store",
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined
+  });
   if (!response.ok) {
     throw new Error(`Failed to load app path ${path}`);
   }
@@ -440,7 +444,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
             <div className="kpi-card"><div className="kpi-label">Clicks</div><div className="kpi-value">{Number(overview.clicks ?? 0).toLocaleString()}</div></div>
             <div className="kpi-card"><div className="kpi-label">CTR</div><div className="kpi-value">{(Number(overview.ctr ?? 0) * 100).toFixed(2)}%</div></div>
             <div className="kpi-card"><div className="kpi-label">Leads</div><div className="kpi-value">{consolidatedLeads.toLocaleString()}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Conversions</div><div className="kpi-value">{Number(overview.conversions ?? 0).toLocaleString()}</div></div>
+            <div className="kpi-card"><div className="kpi-label">MQL</div><div className="kpi-value">{Number(fluentLeads.summary.mql ?? 0).toLocaleString()}</div></div>
+            <div className="kpi-card"><div className="kpi-label">SQL</div><div className="kpi-value">{Number(fluentLeads.summary.sql ?? 0).toLocaleString()}</div></div>
           </section>
 
           <section className="sketch-card sectionCard">
