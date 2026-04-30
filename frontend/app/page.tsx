@@ -198,7 +198,7 @@ function formatSourceName(source: string): string {
   return mapping[source] ?? source.replaceAll("_", " ");
 }
 
-function formatLocalDateTime(value?: string | null): string {
+function formatGmtPlus5DateTime(value?: string | null): string {
   if (!value) {
     return "Never synced";
   }
@@ -206,7 +206,17 @@ function formatLocalDateTime(value?: string | null): string {
   if (Number.isNaN(parsed.getTime())) {
     return String(value);
   }
-  return parsed.toLocaleString();
+  const formatted = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(parsed);
+  return `${formatted} GMT+5`;
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -799,7 +809,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
                     <td>{row.name || "-"}</td>
                     <td>{row.email || "-"}</td>
                     <td>{row.ip || "unknown"}</td>
-                    <td>{formatLocalDateTime(row.logged_in_at)}</td>
+                    <td>{formatGmtPlus5DateTime(row.logged_in_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -810,7 +820,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
             <div className="chart-label">Source Freshness</div>
             {sourceStatus.map((s) => (
               <div key={s.source_name} className="rowItem">
-                {s.source_name}: {formatLocalDateTime(s.last_successful_sync_at)}
+                {s.source_name}: {formatGmtPlus5DateTime(s.last_successful_sync_at)}
               </div>
             ))}
           </section>
