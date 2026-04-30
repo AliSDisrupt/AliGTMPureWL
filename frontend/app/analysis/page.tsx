@@ -85,6 +85,28 @@ function combinedCurrencyDelta(current: number, previous: number): string {
   return `${sign}$${Math.abs(delta).toFixed(2)} (${percentDelta(current, previous)})`;
 }
 
+function deltaClassName(current: number, previous: number): string {
+  const delta = current - previous;
+  if (delta > 0) {
+    return "delta-positive";
+  }
+  if (delta < 0) {
+    return "delta-negative";
+  }
+  return "delta-neutral";
+}
+
+function deltaArrow(current: number, previous: number): string {
+  const delta = current - previous;
+  if (delta > 0) {
+    return "↑";
+  }
+  if (delta < 0) {
+    return "↓";
+  }
+  return "→";
+}
+
 function buildSourceMap(rows: SourceBreakdown[]): Map<string, MetricSet> {
   const map = new Map<string, MetricSet>();
   for (const row of rows) {
@@ -226,15 +248,15 @@ export default async function AnalysisPage({ searchParams }: { searchParams?: Se
             <div className="kpi-card"><div className="kpi-label">Selected Spend</div><div className="kpi-value">${totalCurrent.spend.toFixed(2)}</div></div>
             <div className="kpi-card"><div className="kpi-label">Selected Clicks</div><div className="kpi-value">{totalCurrent.clicks.toLocaleString()}</div></div>
             <div className="kpi-card"><div className="kpi-label">Selected Leads</div><div className="kpi-value">{totalCurrent.leads.toLocaleString()}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Spend WoW</div><div className="kpi-value">{combinedCurrencyDelta(totalCurrent.spend, totalPrevious.spend)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Spend Last Month</div><div className="kpi-value">{combinedCurrencyDelta(totalCurrent.spend, totalMonth.spend)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Spend Last Year</div><div className="kpi-value">{combinedCurrencyDelta(totalCurrent.spend, totalYear.spend)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Clicks WoW</div><div className="kpi-value">{combinedDelta(totalCurrent.clicks, totalPrevious.clicks)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Clicks Last Month</div><div className="kpi-value">{combinedDelta(totalCurrent.clicks, totalMonth.clicks)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Clicks Last Year</div><div className="kpi-value">{combinedDelta(totalCurrent.clicks, totalYear.clicks)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Leads WoW</div><div className="kpi-value">{combinedDelta(totalCurrent.leads, totalPrevious.leads)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Leads Last Month</div><div className="kpi-value">{combinedDelta(totalCurrent.leads, totalMonth.leads)}</div></div>
-            <div className="kpi-card"><div className="kpi-label">Leads Last Year</div><div className="kpi-value">{combinedDelta(totalCurrent.leads, totalYear.leads)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Spend WoW</div><div className={`kpi-value ${deltaClassName(totalCurrent.spend, totalPrevious.spend)}`}>{deltaArrow(totalCurrent.spend, totalPrevious.spend)} {combinedCurrencyDelta(totalCurrent.spend, totalPrevious.spend)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Spend Last Month</div><div className={`kpi-value ${deltaClassName(totalCurrent.spend, totalMonth.spend)}`}>{deltaArrow(totalCurrent.spend, totalMonth.spend)} {combinedCurrencyDelta(totalCurrent.spend, totalMonth.spend)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Spend Last Year</div><div className={`kpi-value ${deltaClassName(totalCurrent.spend, totalYear.spend)}`}>{deltaArrow(totalCurrent.spend, totalYear.spend)} {combinedCurrencyDelta(totalCurrent.spend, totalYear.spend)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Clicks WoW</div><div className={`kpi-value ${deltaClassName(totalCurrent.clicks, totalPrevious.clicks)}`}>{deltaArrow(totalCurrent.clicks, totalPrevious.clicks)} {combinedDelta(totalCurrent.clicks, totalPrevious.clicks)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Clicks Last Month</div><div className={`kpi-value ${deltaClassName(totalCurrent.clicks, totalMonth.clicks)}`}>{deltaArrow(totalCurrent.clicks, totalMonth.clicks)} {combinedDelta(totalCurrent.clicks, totalMonth.clicks)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Clicks Last Year</div><div className={`kpi-value ${deltaClassName(totalCurrent.clicks, totalYear.clicks)}`}>{deltaArrow(totalCurrent.clicks, totalYear.clicks)} {combinedDelta(totalCurrent.clicks, totalYear.clicks)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Leads WoW</div><div className={`kpi-value ${deltaClassName(totalCurrent.leads, totalPrevious.leads)}`}>{deltaArrow(totalCurrent.leads, totalPrevious.leads)} {combinedDelta(totalCurrent.leads, totalPrevious.leads)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Leads Last Month</div><div className={`kpi-value ${deltaClassName(totalCurrent.leads, totalMonth.leads)}`}>{deltaArrow(totalCurrent.leads, totalMonth.leads)} {combinedDelta(totalCurrent.leads, totalMonth.leads)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Leads Last Year</div><div className={`kpi-value ${deltaClassName(totalCurrent.leads, totalYear.leads)}`}>{deltaArrow(totalCurrent.leads, totalYear.leads)} {combinedDelta(totalCurrent.leads, totalYear.leads)}</div></div>
           </section>
 
           <section className="sketch-card">
@@ -268,15 +290,15 @@ export default async function AnalysisPage({ searchParams }: { searchParams?: Se
                       <td>${current.spend.toFixed(2)}</td>
                       <td>{current.clicks.toLocaleString()}</td>
                       <td>{current.leads.toLocaleString()}</td>
-                      <td>{combinedCurrencyDelta(current.spend, previous.spend)}</td>
-                      <td>{combinedCurrencyDelta(current.spend, month.spend)}</td>
-                      <td>{combinedCurrencyDelta(current.spend, year.spend)}</td>
-                      <td>{combinedDelta(current.clicks, previous.clicks)}</td>
-                      <td>{combinedDelta(current.clicks, month.clicks)}</td>
-                      <td>{combinedDelta(current.clicks, year.clicks)}</td>
-                      <td>{combinedDelta(current.leads, previous.leads)}</td>
-                      <td>{combinedDelta(current.leads, month.leads)}</td>
-                      <td>{combinedDelta(current.leads, year.leads)}</td>
+                      <td className={deltaClassName(current.spend, previous.spend)}>{deltaArrow(current.spend, previous.spend)} {combinedCurrencyDelta(current.spend, previous.spend)}</td>
+                      <td className={deltaClassName(current.spend, month.spend)}>{deltaArrow(current.spend, month.spend)} {combinedCurrencyDelta(current.spend, month.spend)}</td>
+                      <td className={deltaClassName(current.spend, year.spend)}>{deltaArrow(current.spend, year.spend)} {combinedCurrencyDelta(current.spend, year.spend)}</td>
+                      <td className={deltaClassName(current.clicks, previous.clicks)}>{deltaArrow(current.clicks, previous.clicks)} {combinedDelta(current.clicks, previous.clicks)}</td>
+                      <td className={deltaClassName(current.clicks, month.clicks)}>{deltaArrow(current.clicks, month.clicks)} {combinedDelta(current.clicks, month.clicks)}</td>
+                      <td className={deltaClassName(current.clicks, year.clicks)}>{deltaArrow(current.clicks, year.clicks)} {combinedDelta(current.clicks, year.clicks)}</td>
+                      <td className={deltaClassName(current.leads, previous.leads)}>{deltaArrow(current.leads, previous.leads)} {combinedDelta(current.leads, previous.leads)}</td>
+                      <td className={deltaClassName(current.leads, month.leads)}>{deltaArrow(current.leads, month.leads)} {combinedDelta(current.leads, month.leads)}</td>
+                      <td className={deltaClassName(current.leads, year.leads)}>{deltaArrow(current.leads, year.leads)} {combinedDelta(current.leads, year.leads)}</td>
                     </tr>
                   );
                 })}
