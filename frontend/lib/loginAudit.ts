@@ -1,5 +1,3 @@
-import { promises as fs } from "node:fs";
-import { dirname, resolve } from "node:path";
 import type { NextRequest } from "next/server";
 
 export type LoginAuditEntry = {
@@ -9,23 +7,18 @@ export type LoginAuditEntry = {
   logged_in_at: string;
 };
 
-const LOGIN_AUDIT_FILE = resolve(process.cwd(), ".data", "user-logins.json");
 const MAX_ENTRIES = 500;
-
-async function ensureAuditFile(): Promise<void> {
-  await fs.mkdir(dirname(LOGIN_AUDIT_FILE), { recursive: true });
-  try {
-    await fs.access(LOGIN_AUDIT_FILE);
-  } catch {
-    await fs.writeFile(LOGIN_AUDIT_FILE, "[]", "utf8");
-  }
-}
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000";
 
 export async function readLoginAudit(): Promise<LoginAuditEntry[]> {
-  await ensureAuditFile();
   try {
-    const raw = await fs.readFile(LOGIN_AUDIT_FILE, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
+    const response = await fetch(`${API_BASE_URL}/auth/logins`, {
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const parsed = (await response.json()) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((entry): entry is LoginAuditEntry => {
@@ -54,7 +47,13 @@ export function getClientIp(request: NextRequest): string {
 }
 
 export async function appendLoginAudit(entry: LoginAuditEntry): Promise<void> {
-  const current = await readLoginAudit();
-  const next = [entry, ...current].slice(0, MAX_ENTRIES);
-  await fs.writeFile(LOGIN_AUDIT_FILE, JSON.stringify(next, null, 2), "utf8");
+  try {
+    await fetch(`${API_BASE_URL}/auth/logins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(entry)
+    });
+  } catch {
+    // noop: login flow should not fail if audit storage is unavailable
+  }
 }

@@ -113,6 +113,14 @@ create table if not exists ingestion_alerts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists user_login_audit (
+  id bigserial primary key,
+  name text not null,
+  email text not null,
+  ip text not null,
+  logged_in_at timestamptz not null default now()
+);
+
 create or replace view campaign_performance_view as
 select
   f.source,

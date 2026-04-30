@@ -4,10 +4,28 @@ import { env } from "./config.js";
 
 type QueryLike = { startDate?: string; endDate?: string };
 type KPI = { spend: string; impressions: string; clicks: string; leads: string; conversions: string; ctr: string };
+type LoginAuditEntry = { name: string; email: string; ip: string; logged_in_at: string };
 
 const ZERO_KPI: KPI = { spend: "0", impressions: "0", clicks: "0", leads: "0", conversions: "0", ctr: "0" };
 const FLUENT_FORM_SHEET_ID = "1T1P5o6vSdgLjsMxzsxJx4hPNtfz-homeji2__ZlVH30";
 const FLUENT_FORM_TABS = ["White-label", "Vpn Reseller-Paid", "Vpn Reseller - Organic", "PurewL", "PureWL - Contact US"];
+let loginAuditTableReady = false;
+
+async function ensureLoginAuditTable(): Promise<void> {
+  if (loginAuditTableReady) {
+    return;
+  }
+  await pool.query(
+    `create table if not exists user_login_audit (
+      id bigserial primary key,
+      name text not null,
+      email text not null,
+      ip text not null,
+      logged_in_at timestamptz not null default now()
+    )`
+  );
+  loginAuditTableReady = true;
+}
 
 function getDateRange(query: QueryLike): { startDate: string; endDate: string } {
   return {
@@ -270,6 +288,50 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       [],
       []
     );
+  });
+
+  app.get("/auth/logins", async () => {
+    try {
+      await ensureLoginAuditTable();
+      const rows = await safeQuery<LoginAuditEntry>(
+        `select
+          name,
+          email,
+          ip,
+          to_char(logged_in_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as logged_in_at
+        from user_login_audit
+        order by logged_in_at desc
+        limit 500`,
+        [],
+        []
+      );
+      return rows;
+    } catch {
+      return [];
+    }
+  });
+
+  app.post("/auth/logins", async (request, reply) => {
+    const body = (request.body ?? {}) as Partial<LoginAuditEntry>;
+    const name = String(body.name ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const ip = String(body.ip ?? "").trim() || "unknown";
+    const loggedInRaw = String(body.logged_in_at ?? "").trim();
+    const loggedInAt = loggedInRaw ? new Date(loggedInRaw) : new Date();
+    if (!name || !email || Number.isNaN(loggedInAt.getTime())) {
+      return reply.status(400).send({ ok: false, error: "invalid_payload" });
+    }
+    try {
+      await ensureLoginAuditTable();
+      await pool.query(
+        `insert into user_login_audit (name, email, ip, logged_in_at)
+         values ($1, $2, $3, $4)`,
+        [name, email, ip, loggedInAt.toISOString()]
+      );
+      return { ok: true };
+    } catch {
+      return reply.status(500).send({ ok: false, error: "audit_store_unavailable" });
+    }
   });
 
   app.get("/kpi/overview", async (request) => {
