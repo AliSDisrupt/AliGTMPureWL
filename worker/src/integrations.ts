@@ -205,6 +205,9 @@ async function fetchWindsorRows(): Promise<WindsorRow[]> {
   const url = new URL(env.WINDSOR_CONNECTOR_URL);
   if (env.WINDSOR_DATE_PRESET?.trim()) {
     url.searchParams.set("date_preset", env.WINDSOR_DATE_PRESET.trim());
+  } else {
+    // Prevent hidden range caps from connector URLs that include date_preset by default.
+    url.searchParams.delete("date_preset");
   }
   url.searchParams.set(
     "fields",

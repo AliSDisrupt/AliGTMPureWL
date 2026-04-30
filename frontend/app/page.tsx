@@ -157,8 +157,15 @@ async function fetchAppJson<T>(path: string): Promise<T> {
 function getDateRange(searchParams?: SearchParams): { startDate: string; endDate: string } {
   const today = new Date();
   const preset = searchParams?.preset ?? "30d";
-  let start = new Date(today.getTime() - 30 * 86400000);
+  let start = new Date(today.getTime() - 29 * 86400000);
   let end = new Date(today);
+
+  const toLocalIsoDate = (value: Date): string => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   if (preset === "today") {
     start = new Date(today);
@@ -167,15 +174,15 @@ function getDateRange(searchParams?: SearchParams): { startDate: string; endDate
     start = new Date(today.getTime() - 86400000);
     end = new Date(today.getTime() - 86400000);
   } else if (preset === "7d") {
-    start = new Date(today.getTime() - 7 * 86400000);
+    start = new Date(today.getTime() - 6 * 86400000);
   } else if (preset === "90d") {
-    start = new Date(today.getTime() - 90 * 86400000);
+    start = new Date(today.getTime() - 89 * 86400000);
   } else if (preset === "mtd") {
     start = new Date(today.getFullYear(), today.getMonth(), 1);
   }
 
-  const defaultStart = start.toISOString().slice(0, 10);
-  const defaultEnd = end.toISOString().slice(0, 10);
+  const defaultStart = toLocalIsoDate(start);
+  const defaultEnd = toLocalIsoDate(end);
   return {
     startDate: searchParams?.startDate ?? defaultStart,
     endDate: searchParams?.endDate ?? defaultEnd
@@ -400,6 +407,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
         </div>
         <div className="sidebar-section-label">Overview</div>
         <a href={`/?${sidebarQuery}`} className={`nav-item ${!source ? "active" : ""}`}><span className="nav-dot">⌂</span>Home</a>
+        <a href="/analysis" className="nav-item"><span className="nav-dot">A</span>Analysis</a>
         <div className="sidebar-section-label">Paid Ads</div>
         <a href={`/?${sidebarQuery}&source=google_ads`} className={`nav-item ${source === "google_ads" ? "active" : ""}`}><span className="nav-dot">G</span>Google Ads</a>
         <a href={`/?${sidebarQuery}&source=reddit_ads`} className={`nav-item ${source === "reddit_ads" ? "active" : ""}`}><span className="nav-dot">R</span>Reddit Ads</a>

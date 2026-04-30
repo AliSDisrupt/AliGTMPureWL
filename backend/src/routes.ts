@@ -82,6 +82,7 @@ type LemlistCampaignStats = {
   clickedCount?: number | string;
   repliedCount?: number | string;
   steps?: LemlistCampaignStepStats[];
+  stats?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -201,14 +202,19 @@ function pickMetricValue(source: Record<string, unknown>, keys: string[]): numbe
 }
 
 function summarizeLemlistStats(stats: LemlistCampaignStats): { sent: number; opened: number; clicked: number; replied: number } {
+  const statsContainer =
+    typeof stats.stats === "object" && stats.stats !== null ? (stats.stats as Record<string, unknown>) : (stats as Record<string, unknown>);
+
   const topLevel = {
-    sent: pickMetricValue(stats, ["messagesSent", "sentCount", "sent", "emailsSent"]),
-    opened: pickMetricValue(stats, ["openedCount", "opened", "emailsOpened"]),
-    clicked: pickMetricValue(stats, ["clickedCount", "clicked", "emailsClicked"]),
-    replied: pickMetricValue(stats, ["repliedCount", "replied", "emailsReplied"])
+    sent: pickMetricValue(statsContainer, ["messagesSent", "sentCount", "sent", "emailsSent"]),
+    opened: pickMetricValue(statsContainer, ["openedCount", "opened", "emailsOpened"]),
+    clicked: pickMetricValue(statsContainer, ["clickedCount", "clicked", "emailsClicked"]),
+    replied: pickMetricValue(statsContainer, ["repliedCount", "replied", "emailsReplied"])
   };
 
-  const steps = Array.isArray(stats.steps) ? stats.steps : [];
+  const stepsRaw =
+    Array.isArray(statsContainer.steps) ? statsContainer.steps : Array.isArray(stats.steps) ? stats.steps : [];
+  const steps = stepsRaw.filter((row): row is LemlistCampaignStepStats => typeof row === "object" && row !== null);
   if (steps.length === 0) {
     return topLevel;
   }
