@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicOrigin } from "../../../../lib/publicOrigin";
 
-const ALLOWED_DOMAINS = new Set(["purevpn.com", "purewl.com", "disrupt.com"]);
 const GOOGLE_AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export async function GET(request: NextRequest) {
+  const origin = getPublicOrigin(request);
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
-    return NextResponse.redirect(new URL("/login?error=google_not_configured", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_not_configured", origin));
   }
   const redirectUri =
-    process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${request.nextUrl.origin}/api/auth/google/callback`;
+    process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${origin}/api/auth/google/callback`;
   const state = crypto.randomUUID();
   const authUrl = new URL(GOOGLE_AUTH_BASE);
   authUrl.searchParams.set("client_id", clientId);

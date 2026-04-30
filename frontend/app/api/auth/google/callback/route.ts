@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendLoginAudit, getClientIp } from "../../../../../lib/loginAudit";
+import { getPublicOrigin } from "../../../../../lib/publicOrigin";
 
 const ALLOWED_DOMAINS = new Set(["purevpn.com", "purewl.com", "disrupt.com"]);
 
@@ -14,21 +15,22 @@ type GoogleUserInfoResponse = {
 };
 
 export async function GET(request: NextRequest) {
+  const origin = getPublicOrigin(request);
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/login?error=google_not_configured", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_not_configured", origin));
   }
 
   const state = request.nextUrl.searchParams.get("state") ?? "";
   const code = request.nextUrl.searchParams.get("code") ?? "";
   const cookieState = request.cookies.get("purewl_google_oauth_state")?.value ?? "";
   if (!code || !state || !cookieState || state !== cookieState) {
-    return NextResponse.redirect(new URL("/login?error=google_state", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_state", origin));
   }
 
   const redirectUri =
-    process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${request.nextUrl.origin}/api/auth/google/callback`;
+    process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${origin}/api/auth/google/callback`;
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -42,19 +44,19 @@ export async function GET(request: NextRequest) {
     })
   });
   if (!tokenResponse.ok) {
-    return NextResponse.redirect(new URL("/login?error=google_token", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_token", origin));
   }
   const tokenData = (await tokenResponse.json()) as GoogleTokenResponse;
   const accessToken = tokenData.access_token;
   if (!accessToken) {
-    return NextResponse.redirect(new URL("/login?error=google_token", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_token", origin));
   }
 
   const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   if (!userResponse.ok) {
-    return NextResponse.redirect(new URL("/login?error=google_userinfo", request.url));
+    return NextResponse.redirect(new URL("/login?error=google_userinfo", origin));
   }
   const userData = (await userResponse.json()) as GoogleUserInfoResponse;
   const email = String(userData.email ?? "").trim().toLowerCase();
@@ -62,10 +64,10 @@ export async function GET(request: NextRequest) {
   const picture = String(userData.picture ?? "").trim();
   const domain = email.split("@")[1] ?? "";
   if (!email || !ALLOWED_DOMAINS.has(domain)) {
-    return NextResponse.redirect(new URL("/login?error=domain_not_allowed", request.url));
+    return NextResponse.redirect(new URL("/login?error=domain_not_allowed", origin));
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(new URL("/", origin));
   response.cookies.set("purewl_auth", email, {
     httpOnly: true,
     sameSite: "lax",

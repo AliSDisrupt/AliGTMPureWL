@@ -203,7 +203,9 @@ async function fetchWindsorRows(): Promise<WindsorRow[]> {
   }
 
   const url = new URL(env.WINDSOR_CONNECTOR_URL);
-  url.searchParams.set("date_preset", "last_90d");
+  if (env.WINDSOR_DATE_PRESET?.trim()) {
+    url.searchParams.set("date_preset", env.WINDSOR_DATE_PRESET.trim());
+  }
   url.searchParams.set(
     "fields",
     "account_name,campaign,clicks,impressions,datasource,date,source,spend,sessions,conversions,event_name,event,event_count,email,activities___id"
