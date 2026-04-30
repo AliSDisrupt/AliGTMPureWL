@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { MongoClient } from "mongodb";
 
 export type LoginAuditEntry = {
   name: string;
@@ -8,17 +9,31 @@ export type LoginAuditEntry = {
 };
 
 const MAX_ENTRIES = 500;
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000";
+const MONGODB_URI = process.env.MONGODB_URI ?? "";
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME ?? "purewl";
+const MONGODB_COLLECTION_NAME = process.env.MONGODB_COLLECTION_NAME ?? "user_login_activity";
+
+let mongoClient: MongoClient | null = null;
+
+function getMongoClient(): MongoClient | null {
+  if (!MONGODB_URI) {
+    return null;
+  }
+  if (!mongoClient) {
+    mongoClient = new MongoClient(MONGODB_URI);
+  }
+  return mongoClient;
+}
 
 export async function readLoginAudit(): Promise<LoginAuditEntry[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/logins`, {
-      cache: "no-store"
-    });
-    if (!response.ok) {
+    const client = getMongoClient();
+    if (!client) {
       return [];
     }
-    const parsed = (await response.json()) as unknown;
+    await client.connect();
+    const collection = client.db(MONGODB_DB_NAME).collection(MONGODB_COLLECTION_NAME);
+    const parsed = (await collection.find({}, { sort: { logged_in_at: -1 }, limit: MAX_ENTRIES }).toArray()) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((entry): entry is LoginAuditEntry => {
@@ -48,10 +63,17 @@ export function getClientIp(request: NextRequest): string {
 
 export async function appendLoginAudit(entry: LoginAuditEntry): Promise<void> {
   try {
-    await fetch(`${API_BASE_URL}/auth/logins`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(entry)
+    const client = getMongoClient();
+    if (!client) {
+      return;
+    }
+    await client.connect();
+    const collection = client.db(MONGODB_DB_NAME).collection(MONGODB_COLLECTION_NAME);
+    await collection.insertOne({
+      name: entry.name,
+      email: entry.email.toLowerCase(),
+      ip: entry.ip,
+      logged_in_at: entry.logged_in_at
     });
   } catch {
     // noop: login flow should not fail if audit storage is unavailable
