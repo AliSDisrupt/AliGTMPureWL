@@ -197,17 +197,29 @@ function pickRowsForSource(rows: WindsorRow[], source: SourceName): WindsorRow[]
   return strictMatches;
 }
 
-async function fetchWindsorRows(): Promise<WindsorRow[]> {
+async function fetchWindsorRows(asOfDate: string): Promise<WindsorRow[]> {
   if (!env.WINDSOR_CONNECTOR_URL) {
     return [];
   }
 
   const url = new URL(env.WINDSOR_CONNECTOR_URL);
+  const dateParamsToClear = ["date_preset", "date_from", "date_to", "start_date", "end_date", "startDate", "endDate", "from", "to", "since"];
+  for (const key of dateParamsToClear) {
+    url.searchParams.delete(key);
+  }
+
   if (env.WINDSOR_DATE_PRESET?.trim()) {
     url.searchParams.set("date_preset", env.WINDSOR_DATE_PRESET.trim());
-  } else {
-    // Prevent hidden range caps from connector URLs that include date_preset by default.
-    url.searchParams.delete("date_preset");
+  } else if (env.WINDSOR_START_DATE?.trim()) {
+    const startDate = env.WINDSOR_START_DATE.trim();
+    const endDate = (env.WINDSOR_END_DATE?.trim() || asOfDate).trim();
+    // Set multiple common aliases because Windsor connector parameters differ by datasource.
+    url.searchParams.set("date_from", startDate);
+    url.searchParams.set("date_to", endDate);
+    url.searchParams.set("start_date", startDate);
+    url.searchParams.set("end_date", endDate);
+    url.searchParams.set("startDate", startDate);
+    url.searchParams.set("endDate", endDate);
   }
   url.searchParams.set(
     "fields",
@@ -352,7 +364,7 @@ async function fetchLemlistCampaignStats(
 }
 
 async function pullFromWindsor(source: SourceName, asOfDate: string): Promise<RawMetric[]> {
-  const rows = await fetchWindsorRows();
+  const rows = await fetchWindsorRows(asOfDate);
   const filtered = pickRowsForSource(rows, source);
 
   return filtered.map((row, idx) => {
