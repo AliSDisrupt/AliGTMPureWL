@@ -285,6 +285,16 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
       ? fluentHubspotMatchesResult.value
       : ({ summary: { checked: 0, matched: 0 }, matched: [] } as FluentHubspotMatchesResponse);
   const userLogins = userLoginsResult.status === "fulfilled" ? userLoginsResult.value : [];
+  const latestLoginByUser = new Map<string, UserLoginRow>();
+  for (const row of userLogins) {
+    const emailKey = String(row.email ?? "").trim().toLowerCase();
+    const fallbackKey = `${String(row.name ?? "").trim().toLowerCase()}|${String(row.ip ?? "").trim()}`;
+    const key = emailKey || fallbackKey;
+    if (!latestLoginByUser.has(key)) {
+      latestLoginByUser.set(key, row);
+    }
+  }
+  const uniqueUserLogins = Array.from(latestLoginByUser.values());
 
   const hasBackendData = [
     overviewResult,
@@ -779,7 +789,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
             <table className="sketch-table">
               <thead><tr><th>Name</th><th>Email</th><th>IP</th><th>Last Login</th></tr></thead>
               <tbody>
-                {userLogins.slice(0, 200).map((row, idx) => (
+                {uniqueUserLogins.slice(0, 200).map((row, idx) => (
                   <tr key={`user-login-${idx}`}>
                     <td>{row.name || "-"}</td>
                     <td>{row.email || "-"}</td>
